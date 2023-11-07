@@ -6,10 +6,14 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,11 +37,12 @@ import androidx.core.text.isDigitsOnly
 import br.com.consultacep.ui.theme.ConsultaCEPTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,38 +64,33 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsultaCEP() {
-    var cep by remember {
-        mutableStateOf("01311100")
-    }
+    var cep by remember { mutableStateOf("01311100") }
+    var address by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var cepInfoList by remember { mutableStateOf(emptyList<Pair<String, Date>>()) }
 
-    var address by remember {
-        mutableStateOf("")
-    }
-
-    var isLoading by remember {
-        mutableStateOf(false)
-    }
-
-    Surface(
+    Surface (
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-    ) {
+    )
+    {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top,
             modifier = Modifier.padding(16.dp)
-        )
-        {
+        ) {
             Text(
-                text = "Digite o CEP para consulta"
+                text = "Informe o CEP para Busca"
+            )
+            Spacer(
+                modifier = Modifier
+                    .padding(16.dp)
             )
             TextField(
                 value = cep,
                 onValueChange = {
-                    if (it.isDigitsOnly()) {
-                        cep = it
-                    }
+                    if(it.isDigitsOnly()) { cep = it }
                 }
                 , label = {Text ("CEP")}
                 , modifier = Modifier
@@ -98,27 +98,38 @@ fun ConsultaCEP() {
                     .border(1.dp, Color.Black)
                     .background(Color.Gray)
                     .padding(2.dp)
-                , keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                ,  keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
             )
-            
-            Button(onClick = {
-                if(cep.length == 8) {
-                    isLoading = true
-                    findAdress(cep) {
-                        result -> address = result
-                        isLoading = false
+
+            Button(
+                onClick = {
+                    if (cep.length == 8) {
+                        isLoading = true
+                        findAddress(cep) { result ->
+                            address = result
+                            isLoading = false
+                        }
                     }
-                }
-               // , enabled = !isLoading
-            }) {
-                Text(text = "Consultar CEP")
+                },
+                enabled = !isLoading
+            ) {
+                Text(text = "Buscar Endereço")
             }
 
-            if(isLoading) {
+            if (isLoading) {
                 CircularProgressIndicator()
-            }
-            else {
+            } else {
                 Text(text = address)
+
+                // Implementação futura de exibição de histórico dos CEPS consultados.
+                //LazyColumn(
+                //    modifier = Modifier.fillMaxSize(),
+                //    verticalArrangement = Arrangement.spacedBy(16.dp)
+                //) {
+                //    items(cepInfoList) { (cep, date) ->
+                //        CepInfo(cep = cep, date = date)
+                //    }
+                //}
             }
         }
     }
@@ -132,29 +143,44 @@ fun ConsultaCEPreview() {
     }
 }
 
-fun findAdress(cep: String, callback: (String) -> Unit) {
-    val baseURL = "https://viacep.com.br/ws/$cep/json/"
+
+private fun findAddress(cep: String, callback: (String) -> Unit) {
+    val baseUrl = "https://viacep.com.br/ws/"
+    val url = "$baseUrl$cep/json/"
 
     CoroutineScope(Dispatchers.IO).launch {
         try {
-            val json = withContext((Dispatchers.IO)) {
-                URL(baseURL).readText()
+            val json = withContext(Dispatchers.IO) {
+                URL(url).readText()
             }
-            delay(5000L)
-            if(!("erro" in json)) {
-                val data = JSONObject(json)
+            val data = JSONObject(json)
+            if (!("erro" in json)) {
                 val address = data.getString("logradouro")
                 val city = data.getString("localidade")
-
-                val fullAddress = "$address - $city"
+                val state = data.getString("uf")
+                val fullAddress = "$address, $city - $state"
                 callback(fullAddress)
+            } else {
+                callback("CEP não encontrado.")
             }
-            else {
-                callback("CEP não encontrado")
-            }
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             callback("Erro na busca do CEP: ${e.message}")
         }
+    }
+}
+
+
+// Implementação futura de exibição de histórico dos CEPS consultados.
+@Composable
+fun CepInfo(
+    cep: String,
+    date: Date
+) {
+    Column(
+        modifier = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(text = "CEP: $cep")
+        Text(text = "Data da Consulta: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(date)}")
     }
 }

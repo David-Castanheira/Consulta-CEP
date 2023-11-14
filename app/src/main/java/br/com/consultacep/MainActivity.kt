@@ -64,33 +64,40 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsultaCEP() {
-    var cep by remember { mutableStateOf("01311100") }
-    var address by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var cepInfoList by remember { mutableStateOf(emptyList<Pair<String, Date>>()) }
+    var cep by remember {
+        mutableStateOf("01311100")
+    }
 
-    Surface (
+    var address by remember {
+        mutableStateOf("")
+    }
+
+    //Adicionar as outras variáveis by remember como acima para os outros campos
+
+    var isLoading by remember {
+        mutableStateOf(false)
+    }
+
+    Surface(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-    )
-    {
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top,
             modifier = Modifier.padding(16.dp)
-        ) {
+        )
+        {
             Text(
-                text = "Informe o CEP para Busca"
-            )
-            Spacer(
-                modifier = Modifier
-                    .padding(16.dp)
+                text = "Digite o CEP para consulta"
             )
             TextField(
                 value = cep,
                 onValueChange = {
-                    if(it.isDigitsOnly()) { cep = it }
+                    if (it.isDigitsOnly()) {
+                        cep = it
+                    }
                 }
                 , label = {Text ("CEP")}
                 , modifier = Modifier
@@ -98,38 +105,27 @@ fun ConsultaCEP() {
                     .border(1.dp, Color.Black)
                     .background(Color.Gray)
                     .padding(2.dp)
-                ,  keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                , keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
             )
-
-            Button(
-                onClick = {
-                    if (cep.length == 8) {
-                        isLoading = true
-                        findAddress(cep) { result ->
-                            address = result
-                            isLoading = false
-                        }
+            
+            Button(onClick = {
+                if(cep.length == 8) {
+                    isLoading = true
+                    findAdress(cep) {
+                        result -> address = result
+                        isLoading = false
                     }
-                },
-                enabled = !isLoading
-            ) {
-                Text(text = "Buscar Endereço")
+                }
+               // , enabled = !isLoading
+            }) {
+                Text(text = "Consultar CEP")
             }
 
-            if (isLoading) {
+            if(isLoading) {
                 CircularProgressIndicator()
-            } else {
+            }
+            else {
                 Text(text = address)
-
-                // Implementação futura de exibição de histórico dos CEPS consultados.
-                //LazyColumn(
-                //    modifier = Modifier.fillMaxSize(),
-                //    verticalArrangement = Arrangement.spacedBy(16.dp)
-                //) {
-                //    items(cepInfoList) { (cep, date) ->
-                //        CepInfo(cep = cep, date = date)
-                //    }
-                //}
             }
         }
     }
@@ -143,44 +139,32 @@ fun ConsultaCEPreview() {
     }
 }
 
-
-private fun findAddress(cep: String, callback: (String) -> Unit) {
-    val baseUrl = "https://viacep.com.br/ws/"
-    val url = "$baseUrl$cep/json/"
+fun findAdress(cep: String, callback: (String) -> Unit) {
+    val baseURL = "https://viacep.com.br/ws/$cep/json/"
 
     CoroutineScope(Dispatchers.IO).launch {
         try {
-            val json = withContext(Dispatchers.IO) {
-                URL(url).readText()
+            val json = withContext((Dispatchers.IO)) {
+                URL(baseURL).readText()
             }
-            val data = JSONObject(json)
-            if (!("erro" in json)) {
+            delay(5000L)
+            if(!("erro" in json)) {
+                val data = JSONObject(json)
                 val address = data.getString("logradouro")
+                val neighborhood = data.getString("bairro")
                 val city = data.getString("localidade")
                 val state = data.getString("uf")
-                val fullAddress = "$address, $city - $state"
+
+                //Verificar se abaixo está correto
+                val fullAddress = "$address - $city - $neighborhood - $state"
                 callback(fullAddress)
-            } else {
-                callback("CEP não encontrado.")
             }
-        } catch (e: Exception) {
+            else {
+                callback("CEP não encontrado")
+            }
+        }
+        catch (e: Exception) {
             callback("Erro na busca do CEP: ${e.message}")
         }
-    }
-}
-
-
-// Implementação futura de exibição de histórico dos CEPS consultados.
-@Composable
-fun CepInfo(
-    cep: String,
-    date: Date
-) {
-    Column(
-        modifier = Modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(text = "CEP: $cep")
-        Text(text = "Data da Consulta: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(date)}")
     }
 }
